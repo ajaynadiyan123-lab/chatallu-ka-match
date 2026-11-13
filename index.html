@@ -1,0 +1,118 @@
+
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chatallu Ka Match</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#10251b;color:white;font-family:Arial;text-align:center}
+header{padding:15px;background:#09150f;font-size:24px;font-weight:bold}
+#table{max-width:750px;margin:12px auto;background:#17643e;border:8px solid #70452b;border-radius:24px;padding:12px}
+.player{background:#104d31;padding:10px;margin:8px;border-radius:12px}
+.team{background:#092b1b;padding:6px;border-radius:8px;font-weight:bold;color:#ffe37b}
+#trick{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;min-height:90px;align-items:center}
+.played{background:white;padding:12px;border-radius:8px;min-width:65px;font-weight:bold;color:#111}
+#cards{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;margin:18px 0}
+.card{width:44px;height:68px;background:white;border:2px solid #ddd;border-radius:7px;font-size:17px;font-weight:bold;color:#111}
+.red{color:#d00!important}.black{color:#111!important}
+.selected{transform:translateY(-12px);border:3px solid gold}
+button,select{padding:10px;border-radius:8px;border:0;margin:4px;font-size:16px}
+button{cursor:pointer;background:#f2d35e;color:#111;font-weight:bold}
+#msg{padding:10px;font-weight:bold;min-height:35px}
+</style>
+</head>
+<body>
+<header>🃏 CHATALLU KA MATCH</header>
+<div id="table">
+<div>
+<select id="mode"><option value="solo">Solo</option><option value="team">Team 2 vs 2</option></select>
+<button onclick="newRound()">New Round</button>
+</div>
+<div id="teamSelect" style="display:none">
+<label>Ajay ka partner:
+<select id="partner"><option value="1">Aman Manjura</option><option value="0">Robin Aibla</option><option value="2">Teetoo</option></select>
+</label>
+</div>
+<div id="p0" class="player"></div>
+<div id="p1" class="player"></div>
+<div id="trick"></div>
+<div id="p2" class="player"></div>
+<div id="p3" class="player"></div>
+<div id="msg">New Round dabao</div>
+<div id="bidbox">Your bid: <select id="bid"></select><button onclick="confirmBid()">Confirm Bid</button></div>
+<div id="cards"></div>
+<button onclick="playHuman()">Play Selected Card</button>
+<button onclick="resetScores()">Reset Score</button>
+<div id="score"></div>
+</div>
+<script>
+const suits=["♠","♥","♦","♣"],ranks=["2","3","4","5","6","7","8","9","10","J","Q","K","A"];
+const names=["Robin Aibla","Aman Manjura","Teetoo","Ajay Nadiyan"];
+let hands=[],bids=[],tricks=[0,0,0,0],scores=[0,0,0,0],played=[],lead=null,turn=3,selected=-1,phase="idle",round=0;
+const $=id=>document.getElementById(id);
+for(let n=1;n<=13;n++)$("bid").innerHTML+=`<option>${n}</option>`;
+function shuffle(a){for(let i=a.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function deck(){return shuffle(suits.flatMap(s=>ranks.map((r,v)=>({s,r,v,id:s+r}))))}
+function partner(){return +$("partner").value}
+function teammate(p){return $("mode").value==="team"&&((p===3&&partner()===p)||(p===partner()))}
+function sameTeam(a,b){if($("mode").value!=="team")return a===b;return (a===3||a===partner())&&(b===3||b===partner())||(a!==3&&a!==partner()&&b!==3&&b!==partner())}
+function newRound(){
+ hands=[[],[],[],[]];bids=[0,0,0,0];tricks=[0,0,0,0];played=[];lead=null;selected=-1;phase="bidding";round++;
+ let d=deck();for(let i=0;i<52;i++)hands[i%4].push(d[i]);
+ hands.forEach(h=>h.sort((a,b)=>suits.indexOf(a.s)-suits.indexOf(b.s)||a.v-b.v));
+ $("trick").innerHTML="";$("score").innerHTML="";$("bidbox").style.display="block";
+ for(let p=0;p<4;p++)if(p!==3)bids[p]=botBidValue(p);
+ turn=3;renderPlayers();showCards();$("msg").innerText="Ajay, apni bid select karo"
+}
+function botBidValue(p){let sp=hands[p].filter(c=>c.s==="♠"&&c.v>=9).length;let high=hands[p].filter(c=>c.v>=11).length;return Math.max(1,Math.min(8,Math.round(sp*.6+high*.4)))}
+function confirmBid(){if(phase!=="bidding")return;bids[3]=+$("bid").value;phase="play";turn=3;$("bidbox").style.display="none";$("msg").innerText="Ajay ki baari";showCards();renderPlayers()}
+function legal(p){let h=hands[p];if(!lead)return h;let f=h.filter(c=>c.s===lead);return f.length?f:h}
+function showCards(){
+ $("cards").innerHTML="";
+ hands[3].forEach((c,i)=>{let b=document.createElement("button");b.className="card "+("♥♦".includes(c.s)?"red":"black")+(selected===i?" selected":"");b.textContent=c.r+c.s;b.onclick=()=>{if(phase==="play"&&turn===3){selected=i;showCards()}};$("cards").appendChild(b)});
+ renderPlayers()
+}
+function playHuman(){
+ if(phase!=="play"||turn!==3||selected<0)return;
+ let c=hands[3][selected];if(!legal(3).some(x=>x.id===c.id)){$("msg").innerText="Follow suit compulsory!";return}
+ put(3,c);selected=-1;advance()
+}
+function put(p,c){hands[p]=hands[p].filter(x=>x.id!==c.id);if(!lead)lead=c.s;played.push({p,c});$("trick").innerHTML=played.map(x=>`<div class="played ${"♥♦".includes(x.c.s)?"red":"black"}">${names[x.p].split(" ")[0]}<br>${x.c.r+x.c.s}</div>`).join("")}
+function beats(a,b){if(a.s==="♠"&&b.s!=="♠")return true;if(a.s!==b.s)return false;return a.v>b.v}
+function currentWinner(){let best=played[0];for(let x of played.slice(1))if(beats(x.c,best.c))best=x;return best.p}
+function botCard(p){
+ let h=legal(p),winner=played.length?currentWinner():-1;
+ if($("mode").value==="team"&&winner!==-1&&sameTeam(p,winner))return h.find(c=>c.s===lead)||h[0];
+ let winning=h.filter(c=>winner===-1||beats(c,played.find(x=>x.p===winner).c));
+ return winning.length?winning.sort((a,b)=>a.v-b.v)[0]:h.sort((a,b)=>a.v-b.v)[0]
+}
+function advance(){
+ if(played.length<4){turn=(turn+1)%4;if(turn===3){$("msg").innerText="Ajay ki baari";showCards()}else setTimeout(()=>{put(turn,botCard(turn));advance()},450);return}
+ let w=currentWinner();tricks[w]++;$("msg").innerText=names[w].split(" ")[0]+" ne trick jeeti!";
+ setTimeout(()=>{played=[];lead=null;$("trick").innerHTML="";
+ if(hands[3].length===0)finish();else{turn=w;if(turn===3){showCards();$("msg").innerText="Ajay ki baari"}else{put(turn,botCard(turn));advance()}}},700)
+}
+function finish(){
+ phase="done";$("cards").innerHTML="";let roundScore=[];
+ for(let p=0;p<4;p++){let s=tricks[p]>=bids[p]?bids[p]+(tricks[p]-bids[p])*.1:-bids[p];scores[p]+=s;roundScore.push(names[p].split(" ")[0]+": "+s.toFixed(1))}
+ if($("mode").value==="team"){
+ let ajayTeam=[3,partner()],other=[0,1,2,3].filter(p=>!ajayTeam.includes(p));
+ $("score").innerHTML="<h3>Team Score</h3>"+ajayTeam.map(p=>names[p].split(" ")[0]).join(" + ")+": "+ajayTeam.reduce((s,p)=>s+scores[p],0).toFixed(1)+"<br>"+other.map(p=>names[p].split(" ")[0]).join(" + ")+": "+other.reduce((s,p)=>s+scores[p],0).toFixed(1)
+ }else $("score").innerHTML="<h3>Round Score</h3>"+roundScore.join("<br>")+"<br>Total: "+scores.map((s,i)=>names[i].split(" ")[0]+" "+s.toFixed(1)).join(" | ");
+ $("msg").innerText="Round "+round+" complete!"
+}
+function renderPlayers(){
+ let teamOn=$("mode").value==="team",pt=partner();
+ [0,1,2,3].forEach(p=>{
+ let head=teamOn?(p===3||p===pt?"TEAM AJAY":"TEAM ROBIN"):names[p];
+ $("p"+p).innerHTML='<div class="team">'+head+'</div>'+names[p]+' | Bid: '+(bids[p]||"-")+' | Tricks: '+tricks[p]
+ })
+}
+$("mode").onchange=()=>{$("teamSelect").style.display=$("mode").value==="team"?"block":"none";renderPlayers()};
+$("partner").onchange=renderPlayers;
+function resetScores(){scores=[0,0,0,0];round=0;newRound()}
+</script>
+</body>
+</html>
