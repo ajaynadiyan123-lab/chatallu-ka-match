@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Chatallu Ka Match</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#10251d;color:#fff;font:16px system-ui;overflow:hidden}
+header{height:52px;display:flex;align-items:center;justify-content:center;font-weight:800;letter-spacing:.5px;background:#142c22;border-bottom:1px solid #355640}
+#scene{height:calc(100dvh - 52px);display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:12px 10px 8px;background:radial-gradient(ellipse at center,#315c42,#10251d 75%)}
+.seat{background:#1b3328;border:1px solid #52765b;border-radius:14px;padding:7px 12px;text-align:center;min-width:100px;box-shadow:0 4px 10px #0005}
+.name{font-weight:700;font-size:14px}.bid{font-size:12px;color:#c7e4ca}
+.table{width:min(94vw,560px);height:34vh;min-height:220px;border:13px solid #6b4128;border-radius:28px;background:#17623e;box-shadow:0 16px 28px #0008,inset 0 0 18px #092d1b;display:flex;align-items:center;justify-content:center;position:relative}
+.center{font-size:13px;color:#c7e8d1;text-align:center}
+.cardsplayed{position:absolute;inset:0;display:grid;grid-template:1fr 1fr/1fr 1fr;align-items:center;justify-items:center;pointer-events:none}
+.played{font-size:26px;background:#fff;color:#111;border-radius:7px;padding:5px 8px;box-shadow:0 3px 8px #0005;min-width:43px;text-align:center}
+.hand{display:flex;justify-content:center;gap:3px;flex-wrap:wrap;max-width:96vw}
+.card{background:#fff;color:#111;border:1px solid #ddd;border-radius:8px;width:43px;height:66px;font-weight:700;font-size:15px;box-shadow:0 3px 6px #0005}
+.card.red{color:#c22}.card:disabled{opacity:.45}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center}
+button,select{border:0;border-radius:10px;padding:10px 13px;font-weight:700;background:#e8c56b;color:#19251b}
+#msg{font-size:13px;text-align:center;min-height:20px;color:#d9f2df}
+.overlay{position:fixed;inset:52px 0 0;background:#07140fe8;display:flex;align-items:center;justify-content:center;padding:18px;z-index:4}
+.panel{background:#183426;border:1px solid #50765a;border-radius:18px;padding:20px;width:min(92vw,420px);text-align:center}
+.panel h2{margin:0 0 12px}.panel p{font-size:14px;color:#d0e5d4}
+</style></head>
+<body>
+<header>♠ CHATALLU KA MATCH ♠</header>
+<div id="scene">
+ <div class="seat"><div class="name" id="north">Aman Manjura</div><div class="bid" id="nbid">Bot · —</div></div>
+ <div class="seat" style="position:absolute;left:7px;top:43%"><div class="name" id="west">Teetoo</div><div class="bid">Bot</div></div>
+ <div class="seat" style="position:absolute;right:7px;top:43%"><div class="name" id="east">Robin Aibla</div><div class="bid">Bot</div></div>
+ <div class="table"><div class="center" id="center">Green felt table<br>Round 1</div><div class="cardsplayed" id="played"></div></div>
+ <div class="seat"><div class="name">Ajay Nadiyan · You</div><div class="bid" id="yourbid">Bid: — · Tricks: 0</div></div>
+ <div id="msg">Game shuru karne ke liye New Game dabao.</div>
+ <div class="hand" id="hand"></div>
+ <div class="controls"><button onclick="newGame()">New Game</button><button onclick="toggleMic()">🎙️ Mic <span id="mic">OFF</span></button><button onclick="demoTalk()">😄 Reaction demo</button><select id="mode" onchange="modeChange()"><option value="solo">Solo vs Bots</option><option value="team">Team 2v2 (demo)</option></select></div>
+</div>
+<div class="overlay" id="start"><div class="panel"><h2>Chatallu Ka Match</h2><p>Basic playable Call Break prototype · 2D cards, not the final 3D game.</p><p>Choose mode and start a round.</p><button onclick="newGame()">Start Game</button></div></div>
+<div class="overlay" id="bidBox" style="display:none"><div class="panel"><h2>Apni Bid Chuno</h2><p>1 se 13 tricks</p><select id="bidSelect" style="font-size:20px;margin:10px"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option><option>12</option><option>13</option></select><br><button onclick="confirmBid()">Bid Confirm</button></div></div>
+<script>
+const suits=['♠','♥','♦','♣'], ranks=['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+let hands=[], bids=[0,0,0,0], tricks=[0,0,0,0], played=[],turn=0,leadSuit=null,trump='♠',round=1,active=false,mic=false,mode='solo';
+const names=['Ajay Nadiyan','Aman Manjura','Robin Aibla','Teetoo'];
+function deck(){let d=[];for(let s of suits)for(let r=0;r<13;r++)d.push({s,r,v:ranks[r]});return d}
+function shuffle(a){for(let i=a.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function sortHand(h){h.sort((a,b)=>suits.indexOf(a.s)-suits.indexOf(b.s)||a.r-b.r)}
+function newGame(){document.getElementById('start').style.display='none';document.getElementById('bidBox').style.display='flex';mode=document.getElementById('mode').value;hands=[[],[],[],[]];bids=[0,0,0,0];tricks=[0,0,0,0];played=[];let d=shuffle(deck());for(let i=0;i<52;i++)hands[i%4].push(d[i]);hands.forEach(sortHand);turn=0;leadSuit=null;active=false;for(let p=1;p<4;p++)bids[p]=1+Math.floor(Math.random()*5);update();say('Bid select karke confirm karein.')}
+function confirmBid(){bids[0]=parseInt(document.getElementById('bidSelect').value);document.getElementById('bidBox').style.display='none';active=true;update();say('Aapki baari. Card chuno.')}
+function legal(p){let h=hands[p];if(!leadSuit)return h;if(h.some(c=>c.s===leadSuit))return h.filter(c=>c.s===leadSuit);return h}
+function val(c){return c.r}
+function winner(arr){let lead=arr[0].card.s;let best=arr[0];for(let x of arr){if(x.card.s===trump&&(best.card.s!==trump||x.card.r>best.card.r))best=x;else if(best.card.s!==trump&&x.card.s===lead&&best.card.s===lead&&x.card.r>best.card.r)best=x}return best.p}
+function play(p,c){hands[p]=hands[p].filter(x=>!(x.s===c.s&&x.r===c.r));if(!leadSuit)leadSuit=c.s;played.push({p,card:c});turn=(p+1)%4;renderPlayed();if(played.length===4){let w=winner(played);tricks[w]++;say(names[w]+' ne trick jeeti');setTimeout(()=>{played=[];leadSuit=null;turn=w;renderPlayed();if(hands.every(h=>h.length===0)){finish();return}if(turn!==0)botTurn();else update()},900)}else{update();if(turn!==0)setTimeout(botTurn,550)}}
+function botTurn(){if(!active||turn===0)return;let h=legal(turn),c;if(played.length===3){c=h.find(x=>x.s===trump)||h[0]}else c=h[Math.floor(Math.random()*h.length)];let p=turn;play(p,c)}
+function finish(){active=false;let score=tricks.map((t,i)=>t>=bids[i]?bids[i]+(t-bids[i])*.1:-bids[i]);document.getElementById('msg').textContent='Round complete · Tricks '+tricks.join(' / ')+' · Score '+score.map(x=>x.toFixed(1)).join(' / ');document.getElementById('hand').innerHTML='<button onclick="newGame()">Next Round</button>'}
+function update(){document.getElementById('north').textContent=names[1];document.getElementById('west').textContent=names[3];document.getElementById('east').textContent=names[2];document.getElementById('nbid').textContent='Bid '+bids[1]+' · Tricks '+tricks[1];document.getElementById('yourbid').textContent='Bid '+bids[0]+' · Tricks '+tricks[0];document.getElementById('center').innerHTML='Round '+round+'<br>Tricks: '+tricks.reduce((a,b)=>a+b,0)+'/13';let h=document.getElementById('hand');h.innerHTML='';if(hands[0]&&hands[0].length&&(!active||turn===0)){(active?legal(0):hands[0]).forEach(c=>{let b=document.createElement('button');b.className='card '+('♥♦'.includes(c.s)?'red':'');b.innerHTML=c.v+c.s;if(active)b.onclick=()=>play(0,c);else b.disabled=true;h.appendChild(b)})}else h.innerHTML='<small>Bot ki baari…</small>';document.getElementById('msg').textContent=active?(turn===0?'Aapki baari — legal card chuno':'Bots khel rahe hain'):(hands[0]&&hands[0].length?'Apne cards dekho aur bid lagao':'Round complete')}
+function renderPlayed(){let el=document.getElementById('played');el.innerHTML='';played.forEach(x=>{let d=document.createElement('div');d.className='played';d.textContent=x.card.v+x.card.s;el.appendChild(d)})}
+function say(t){document.getElementById('msg').textContent=t}
+function toggleMic(){mic=!mic;document.getElementById('mic').textContent=mic?'ON':'OFF';say(mic?'Mic permission/demo toggle ON (real online voice not implemented)':'Mic OFF')}
+function demoTalk(){say('😆 Character reaction demo: Chal nikal bhosdike');if('speechSynthesis'in window){let u=new SpeechSynthesisUtterance('Chal nikal bhosdike');u.lang='hi-IN';speechSynthesis.cancel();speechSynthesis.speak(u)}}
+function modeChange(){mode=document.getElementById('mode').value;say(mode==='team'?'Team 2v2 selected — team scoring not implemented in this prototype':'Solo vs Bots selected')}
+</script></body></html>
