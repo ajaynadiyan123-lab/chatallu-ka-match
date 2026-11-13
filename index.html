@@ -1,0 +1,158 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chatallu Ka Match</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#10251c;color:white;font-family:Arial;text-align:center}
+header{padding:16px;background:#091710;color:#ffd36a;font-size:25px;font-weight:bold}
+button,select{padding:10px;border-radius:8px;border:0;font-weight:bold;margin:5px}
+button{background:#ffc94d;color:#172116}
+.panel{padding:12px}
+.table{background:#17623c;border:9px solid #754526;border-radius:30px;
+margin:12px auto;padding:15px;max-width:650px;min-height:350px}
+.players{display:flex;justify-content:space-around;flex-wrap:wrap;gap:8px}
+.player{background:#0c3b27;padding:8px;border-radius:12px;min-width:110px}
+.avatar{width:75px;height:75px;border-radius:50%;margin:auto;
+background-image:url('characters.jpg');background-size:400% 100%;background-repeat:no-repeat}
+.cards{display:flex;justify-content:center;flex-wrap:wrap;gap:5px;margin:12px}
+.card{background:white;color:black;border:2px solid #ddd;border-radius:8px;
+width:43px;height:65px;font-size:20px;display:flex;align-items:center;
+justify-content:center;cursor:pointer}
+.red{color:#d21b32}.selected{transform:translateY(-12px);border:3px solid gold}
+#log{min-height:30px;color:#ffe08b}
+</style>
+</head>
+<body>
+<header>🃏 CHATALLU KA MATCH</header>
+<div class="panel">
+<select id="mode"><option value="solo">Solo</option><option value="team">Team 2v2</option></select>
+<select id="partner">
+<option value="1">Aman Manjura</option>
+<option value="2">Robin Aibla</option>
+<option value="0">Teetoo</option>
+</select>
+<button onclick="start()">NEW MATCH</button>
+</div>
+<div class="table">
+<div class="players" id="players"></div>
+<h3 id="round">Choose your bid</h3>
+<div id="trick"></div>
+<div id="log"></div>
+</div>
+<h3>Your Cards</h3>
+<div class="cards" id="hand"></div>
+<button onclick="play()">PLAY CARD</button>
+<div class="panel">Bid: <select id="bid"></select>
+<button onclick="placeBid()">CONFIRM BID</button></div>
+<div id="score"></div>
+
+<script>
+const names=["Teetoo","Aman Manjura","Ajay Nadiyan","Robin Aibla"];
+const colors=["#ed8a27","#f5c928","#111111","#477b45"];
+let deck=[],hands=[],played=[],bids=[],tricks=[0,0,0,0];
+let turn=2,selected=-1,lead=-1,trump="♠",roundNo=1,phase="bid",partner=1;
+const suits=["♠","♥","♦","♣"],values=["2","3","4","5","6","7","8","9","10","J","Q","K","A"];
+const $=id=>document.getElementById(id);
+function cardName(c){return c.v+c.s}
+function strength(c){return values.indexOf(c.v)}
+function sameTeam(a,b){
+ if($("mode").value==="solo")return a===b;
+ return (a===2&&b===partner)||(b===2&&a===partner)||
+ (a!==2&&a!==partner&&b!==2&&b!==partner);
+}
+function start(){
+ partner=+$("partner").value;deck=[];
+ suits.forEach(s=>values.forEach(v=>deck.push({s,v})));
+ deck.sort(()=>Math.random()-.5);
+ hands=[[],[],[],[]];played=[];bids=[null,null,null,null];tricks=[0,0,0,0];
+ for(let i=0;i<52;i++)hands[i%4].push(deck[i]);
+ hands.forEach(h=>h.sort((a,b)=>suits.indexOf(a.s)-suits.indexOf(b.s)||strength(a)-strength(b)));
+ turn=2;phase="bid";selected=-1;lead=-1;roundNo=1;
+ $("log").textContent="Match started! Select your bid.";
+ render();showHand();
+}
+function render(){
+ $("players").innerHTML=names.map((n,i)=>`<div class="player">
+ <div class="avatar" style="background-position:${i*33.333}% center"></div>
+ <b>${n}</b><br>${bids[i]===null?"Bid: —":"Bid: "+bids[i]}<br>Tricks: ${tricks[i]}</div>`).join("");
+ $("round").textContent=phase==="bid"?"Choose your bid":"Trick "+roundNo+" / 13";
+ $("score").textContent=$("mode").value==="team"?
+ `TEAM AJAY + ${names[partner]}: ${tricks[2]+tricks[partner]} | OPPONENTS: ${tricks.reduce((a,x,i)=>a+(i!==2&&i!==partner?x:0),0)}`:
+ `Your tricks: ${tricks[2]}`;
+}
+function showHand(){
+ $("hand").innerHTML=hands[2].map((c,i)=>`<div class="card ${c.s==="♥"||c.s==="♦"?"red":""} ${i===selected?"selected":""}" onclick="selectCard(${i})">${c.v}<br>${c.s}</div>`).join("");
+}
+function selectCard(i){selected=i;showHand()}
+function placeBid(){
+ if(phase!=="bid")return;
+ bids[2]=+$("bid").value;
+ for(let p=0;p<4;p++)if(p!==2)bids[p]=Math.min(13,Math.max(1,Math.floor(Math.random()*7)+3));
+ phase="play";turn=2;render();botUntilHuman();
+}
+function legalCards(p){
+ if(lead===-1)return hands[p];
+ let suit=played[0].c.s,follow=hands[p].filter(c=>c.s===suit);
+ return follow.length?follow:hands[p];
+}
+function play(){
+ if(phase!=="play"||turn!==2||selected<0)return;
+ let legal=legalCards(2),c=hands[2][selected];
+ if(!legal.includes(c)){ $("log").textContent="Follow suit if possible!";return}
+ put(2,c);selected=-1;nextTurn();
+}
+function put(p,c){
+ hands[p].splice(hands[p].indexOf(c),1);
+ played.push({p,c});
+ if(lead===-1)lead=c.s;
+ $("trick").innerHTML=played.map(x=>`<span style="font-size:30px;margin:8px;color:${"♥♦".includes(x.c.s)?"#ff6b6b":"white"}">${names[x.p]}: ${cardName(x.c)}</span>`).join(" ");
+}
+function beats(a,b,s){
+ if(a.s==="♠"&&b.s!=="♠")return true;
+ if(a.s!==b.s)return false;
+ return strength(a)>strength(b);
+}
+function winner(){
+ let best=played[0];
+ for(let x of played.slice(1))if(beats(x.c,best.c,lead))best=x;
+ return best.p;
+}
+function nextTurn(){
+ turn=(turn+1)%4;
+ if(played.length===4){
+ let w=winner();tricks[w]++;$("log").textContent=names[w]+" wins the trick!";
+ setTimeout(()=>{
+ played=[];lead=-1;$("trick").innerHTML="";
+ roundNo++;
+ if(roundNo>13){phase="end";$("round").textContent="MATCH COMPLETE";$("log").textContent="Game over!";render();return}
+ turn=w;render();botUntilHuman();
+ },900);return;
+ }
+ render();botUntilHuman();
+}
+function botCard(p){
+ let legal=legalCards(p);
+ // Smart-ish bot: conserve high cards; trump if losing and needed; partner-aware
+ let current=played.length?played.reduce((best,x)=>beats(x.c,best.c,lead)?x:best,played[0]):null;
+ let winning=legal.filter(c=>!current||beats(c,current.c,lead));
+ if(current&&sameTeam(p,current.p))return legal.slice().sort((a,b)=>strength(a)-strength(b))[0];
+ if(winning.length)return winning.sort((a,b)=>strength(a)-strength(b))[0];
+ return legal.sort((a,b)=>strength(a)-strength(b))[0];
+}
+function botUntilHuman(){
+ if(phase!=="play"||turn===2)return;
+ setTimeout(()=>{
+ if(phase!=="play"||turn===2)return;
+ put(turn,botCard(turn));nextTurn();
+ },650);
+}
+$("bid").innerHTML=Array.from({length:13},(_,i)=>`<option>${i+1}</option>`).join("");
+$("mode").onchange=()=>{$("partner").disabled=$("mode").value==="solo"};
+start();
+</script>
+</body>
+</html>
